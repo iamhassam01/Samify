@@ -14,12 +14,10 @@
   <img src="https://github.com/iamhassam01/Samify/blob/main/fastlane/metadata/android/en-US/images/screenshots/screenshot_6.png" width="30%" />
 </p>
 
-<img
-src="https://github.com/iamhassam01/Samify/blob/main/fastlane/metadata/android/en-US/images/featureGraphic.png" width="91%" />
-
-[![Latest release](https://img.shields.io/github/v/release/iamhassam01/Samify?style=for-the-badge)](https://github.com/iamhassam01/Samify/releases)
-[![GitHub license](https://img.shields.io/github/license/iamhassam01/Samify?style=for-the-badge)](https://github.com/iamhassam01/Samify/blob/main/LICENSE)
-[![Downloads](https://img.shields.io/github/downloads/iamhassam01/Samify/total?style=for-the-badge)](https://github.com/iamhassam01/Samify/releases)
+[![Latest release](https://img.shields.io/github/v/release/iamhassam01/Samify?style=for-the-badge&logo=github)](https://github.com/iamhassam01/Samify/releases)
+[![GitHub license](https://img.shields.io/github/license/iamhassam01/Samify?style=for-the-badge&logo=github)](https://github.com/iamhassam01/Samify/blob/main/LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/iamhassam01/Samify/total?style=for-the-badge&logo=github)](https://github.com/iamhassam01/Samify/releases)
+[![Stars](https://img.shields.io/github/stars/iamhassam01/Samify?style=for-the-badge&logo=github)](https://github.com/iamhassam01/Samify/stargazers)
 </div>
 
 <div align="center">
