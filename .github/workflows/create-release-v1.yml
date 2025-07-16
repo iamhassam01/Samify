@@ -1,0 +1,163 @@
+name: Create Release v1.0.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '1.0.0'
+      tag:
+        description: 'Git tag for release'
+        required: true
+        default: 'v1.0.0'
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify tag exists
+        run: |
+          if ! git tag | grep -q "^${{ inputs.tag }}$"; then
+            echo "Error: Git tag ${{ inputs.tag }} does not exist"
+            exit 1
+          fi
+          echo "✅ Git tag ${{ inputs.tag }} found"
+
+      - name: Check APK files
+        run: |
+          cd releases
+          apk_files=(
+            "Samify-v${{ inputs.version }}-arm64.apk"
+            "Samify-v${{ inputs.version }}-armeabi.apk"
+            "Samify-v${{ inputs.version }}-universal.apk"
+            "Samify-v${{ inputs.version }}-x86.apk"
+            "Samify-v${{ inputs.version }}-x86_64.apk"
+          )
+          
+          for apk in "${apk_files[@]}"; do
+            if [ ! -f "$apk" ]; then
+              echo "❌ Missing: $apk"
+              exit 1
+            else
+              echo "✅ Found: $apk ($(du -h "$apk" | cut -f1))"
+            fi
+          done
+
+      - name: Create Release Notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          # 🎵 Samify v${{ inputs.version }} - Initial Release
+
+          Welcome to the first official release of **Samify**, a modern YouTube Music client for Android! 🎉
+
+          ## 📱 What is Samify?
+
+          Samify is a feature-rich YouTube Music client that provides an enhanced music streaming experience with powerful features like background playback, offline downloads, and a beautiful Material 3 design.
+
+          ## ✨ Key Features
+
+          ### 🎵 **Music Streaming**
+          - Play any song or video from YouTube Music
+          - Background playback support
+          - Personalized quick picks
+          - Search for songs, albums, artists, videos, and playlists
+          - YouTube Music account login support
+
+          ### 📚 **Library Management**
+          - Sync songs, artists, albums, and playlists with your account
+          - Local playlist management
+          - Import playlists from other services
+          - Library organization and management
+
+          ### 🎧 **Audio Experience**
+          - Live lyrics display
+          - Audio normalization
+          - Adjust tempo and pitch
+          - Skip silence feature
+          - Sleep timer
+
+          ### 💾 **Offline Support**
+          - Download and cache songs for offline playback
+          - Offline library access
+
+          ### 🎨 **Customization**
+          - Material 3 design system
+          - Light, Dark, Black, and Dynamic themes
+          - Modern and intuitive interface
+
+          ### 🔧 **Advanced Features**
+          - Reorder songs in playlist or queue
+          - Background playback optimization
+          - Android Auto support (with setup)
+          - Scrobbling support (via third-party apps like Pano Scrobbler)
+
+          ## 📦 Download Options
+
+          This release includes APK files for all major Android architectures:
+
+          - **Universal APK**: Works on all devices (recommended for most users)
+          - **ARM64**: For modern 64-bit ARM devices
+          - **ARMv7**: For older 32-bit ARM devices
+          - **x86**: For Intel-based Android devices
+          - **x86_64**: For 64-bit Intel-based Android devices
+
+          ## ⚠️ Important Notes
+
+          - **Region Requirement**: YouTube Music must be supported in your region. If not available, you'll need a VPN or proxy to connect to a supported region.
+          - **Android Auto**: Requires enabling "Unknown sources" in Android Auto developer settings.
+          - **Scrobbling**: Use third-party apps like [Pano Scrobbler](https://play.google.com/store/apps/details?id=com.arn.scrobble) for Last.fm integration.
+
+          ## 🔒 Requirements
+
+          - Android 8.0 (API level 26) or higher
+          - Internet connection for streaming
+          - YouTube Music account (optional but recommended)
+
+          ## 🆘 Support
+
+          If you encounter any issues or have questions, please:
+          1. Check the FAQ section in the README
+          2. Open an issue on GitHub
+          3. Make sure you're in a supported region or using a VPN
+
+          ## 📄 License
+
+          This project is licensed under the GNU General Public License v3.0. See the LICENSE file for details.
+
+          ## ⚖️ Disclaimer
+
+          This project is not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, or any of its affiliates and subsidiaries. All trademarks and service marks are owned by their respective owners.
+
+          ---
+
+          **Thank you for using Samify! 🎵**
+
+          We hope you enjoy this initial release. Your feedback and contributions are welcome!
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ inputs.tag }}" \
+            --title "Samify v${{ inputs.version }}" \
+            --notes-file release-notes.md \
+            --target "${{ inputs.tag }}" \
+            releases/Samify-v${{ inputs.version }}-arm64.apk \
+            releases/Samify-v${{ inputs.version }}-armeabi.apk \
+            releases/Samify-v${{ inputs.version }}-universal.apk \
+            releases/Samify-v${{ inputs.version }}-x86.apk \
+            releases/Samify-v${{ inputs.version }}-x86_64.apk
+
+      - name: Verify Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🎉 Release created successfully!"
+          gh release view "${{ inputs.tag }}"
