@@ -1,5 +1,5 @@
 <div align="center">
-<img src="https://github.com/iamhassam01/Samify/blob/main/fastlane/metadata/android/en-US/images/icon.png" width="160" height="160" style="display: block; margin: 0 auto"/>
+<img src="https://github.com/iamhassam01/Samify/blob/main/assets/ic_launcher-playstore.png" width="160" height="160" style="display: block; margin: 0 auto"/>
 <h1>Samify</h1>
 <p>YouTube Music client for Android</p>
 
@@ -47,24 +47,10 @@ src="https://github.com/iamhassam01/Samify/blob/main/fastlane/metadata/android/e
 - etc.
 
 <div align="center">
-<h1>Download Now</h1>
+<h1>Download</h1>
 
 [<img src="https://github.com/machiav3lli/oandbackupx/blob/034b226cea5c1b30eb4f6a6f313e4dadcbb0ece4/badge_github.png" alt="Get it on GitHub" height="82"
-align="center">](https://github.com/mostafaalagamy/Metrolist/releases/latest/download/Metrolist.apk)
-
-[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height="80"
-align="center">](https://apt.izzysoft.de/fdroid/index/apk/com.metrolist.music)
-
-[<img src="https://www.openapk.net/images/openapk-badge.png" alt="Get it on OpenAPK" height="80"
-align="center">](https://www.openapk.net/metrolist/com.metrolist.music/)
-
-[<img src="https://github.com/ImranR98/Obtainium/blob/main/assets/graphics/badge_obtainium.png"
-alt="Get it on Obtainium"
-height="55"
-align="center">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/mostafaalagamy/Metrolist/)
-
-[<img src="https://github.com/mostafaalagamy/Metrolist/blob/main/fastlane/metadata/android/en-US/images/belberi_github.png" alt="Get it on Belberi" height="82"
-align="center">](https://belberi.com/metrolist/?fbclid=PAY2xjawJP5dlleHRuA2FlbQIxMAABpjSk1oBp4e8aSV4nfX2dfunQObTlMWIkN-aVA9CSq36pnmkHsvfoYTjhHg_aem_9o9OGbQuZ2PjJTArq21UDA)
+align="center">](https://github.com/iamhassam01/Samify/releases/latest)
 
 </div>
 
@@ -74,24 +60,10 @@ align="center">](https://belberi.com/metrolist/?fbclid=PAY2xjawJP5dlleHRuA2FlbQI
 ***unless*** you have a proxy or VPN to connect to a YTM supported region.
 
 <div align="center">
-<h1>Translations</h1>
-
-[![Translation status](https://img.shields.io/weblate/progress/metrolist?style=for-the-badge)](https://hosted.weblate.org/engage/metrolist/)
-
-We use Weblate to translate Metrolist. For more details or to get started, visit our [Weblate page](https://hosted.weblate.org/projects/Metrolist/).
-
-<a href="https://hosted.weblate.org/projects/Metrolist/">
-<img src="https://hosted.weblate.org/widget/Metrolist/multi-auto.svg" alt="Translation status" />
-</a>
-
-Thank you very much for helping to make Metrolist accessible to many people worldwide.
-</div>
-
-<div align="center">
 <h1>FAQ</h1>
 </div>
 
-<h3> Q: Why Metrolist isn't showing in Android Auto? </h3>
+<h3> Q: Why Samify isn't showing in Android Auto? </h3>
 
 1. Go to Android Auto's settings and tap multiple times on the version in the bottom to enable
    developer settings
@@ -103,48 +75,9 @@ Thank you very much for helping to make Metrolist accessible to many people worl
 Use other music scrobbler apps, I recommend [Pano Scrobbler](https://play.google.com/store/apps/details?id=com.arn.scrobble).
 
 <div align="center">
-<h1>Support Me</h1>
-
-If you'd like to support my work, send a Monero (XMR) donation to this address:
-
-44XjSELSWcgJTZiCKzjpCQWyXhokrH9RqH3rpp35FkSKi57T25hniHWHQNhLeXyFn3DDYqufmfRB1iEtENerZpJc7xJCcqt
-
-Or scan this QR code:
-
-<img src="https://github.com/mostafaalagamy/Metrolist/blob/main/assets/XMR.png" alt="QR Code" width="200" height="200" />
-<br />
-
-Or other
-
-<a href="https://www.buymeacoffee.com/mostafaalagamy">
-  <img src="https://github.com/mostafaalagamy/Metrolist/blob/main/assets/buymeacoffee.png?raw=true" alt="Buy Me a Coffee" width="150" height="150" />
-</a>
-
-<br />
-
-<a href="https://liberapay.com/mostafaalagamy/donate">
-  <img src="https://liberapay.com/assets/widgets/donate.svg" alt="Donate" width="100" height="100" />
-</a>
-
-
-<div align="center">
-<h1>Special thanks</h1>
-
-InnerTune:
-[Zion Huang](https://github.com/z-huang),
-[Malopieds](https://github.com/Malopieds),
-OuterTune:
-[Davide Garberi](https://github.com/DD3Boh),
-[Michael Zh](https://github.com/mikooomich),
-Muzza:
-[Maloy Android](https://github.com/Maloy-Android)
-
-</div>
-
-<div align="center">
 <h1>Disclaimer</h1>
 </div>
 
-This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC, Metrolist Group LLC or any of its affiliates and subsidiaries.
+This project and its contents are not affiliated with, funded, authorized, endorsed by, or in any way associated with YouTube, Google LLC or any of its affiliates and subsidiaries.
 
 Any trademark, service mark, trade name, or other intellectual property rights used in this project are owned by the respective owners.
