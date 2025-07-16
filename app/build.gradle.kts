@@ -10,15 +10,15 @@ plugins {
 }
 
 android {
-    namespace = "com.metrolist.music"
+    namespace = "com.samify.music"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.metrolist.music"
+        applicationId = "com.samify.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.5.0"
 
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -79,6 +79,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("persistentDebug")
         }
         debug {
             applicationIdSuffix = ".debug"
