@@ -70,6 +70,35 @@ import com.samify.music.ui.component.TextFieldDialog
 import com.samify.music.utils.rememberPreference
 import com.samify.music.viewmodels.HomeViewModel
 
+/**
+ * Compare two version strings to determine if the new version is newer
+ * @param currentVersion The current version (e.g., "2.0.0")
+ * @param newVersion The version to compare against (e.g., "1.5.0")
+ * @return true if newVersion is newer than currentVersion
+ */
+private fun isNewerVersion(currentVersion: String, newVersion: String): Boolean {
+    try {
+        val currentParts = currentVersion.split(".").map { it.toIntOrNull() ?: 0 }
+        val newParts = newVersion.split(".").map { it.toIntOrNull() ?: 0 }
+        
+        val maxLength = maxOf(currentParts.size, newParts.size)
+        for (i in 0 until maxLength) {
+            val currentPart = currentParts.getOrElse(i) { 0 }
+            val newPart = newParts.getOrElse(i) { 0 }
+            
+            when {
+                newPart > currentPart -> return true
+                newPart < currentPart -> return false
+                // Continue to next part if equal
+            }
+        }
+        return false // Versions are equal
+    } catch (e: Exception) {
+        // Fallback to string comparison if parsing fails
+        return newVersion != currentVersion
+    }
+}
+
 @Composable
 fun AccountSettings(
     navController: NavController,
@@ -283,25 +312,11 @@ fun AccountSettings(
                 .background(MaterialTheme.colorScheme.surfaceContainer)
         ) {
             PreferenceEntry(
-                title = { Text(stringResource(R.string.discord_integration)) },
-                icon = { Icon(painterResource(R.drawable.discord), null) },
-                onClick = {
-                    onClose()
-                    navController.navigate("settings/discord")
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            PreferenceEntry(
                 title = { Text(stringResource(R.string.settings)) },
                 icon = {
                     BadgedBox(
                         badge = {
-                            if (latestVersionName != BuildConfig.VERSION_NAME) {
+                            if (isNewerVersion(BuildConfig.VERSION_NAME, latestVersionName)) {
                                 Badge()
                             }
                         }
@@ -320,7 +335,7 @@ fun AccountSettings(
 
             Spacer(Modifier.height(4.dp))
 
-            if (latestVersionName != BuildConfig.VERSION_NAME) {
+            if (isNewerVersion(BuildConfig.VERSION_NAME, latestVersionName)) {
                 PreferenceEntry(
                     title = {
                         Text(text = stringResource(R.string.new_version_available))

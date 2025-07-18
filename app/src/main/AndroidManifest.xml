@@ -15,6 +15,8 @@
         <intent>
             <action android:name="android.media.action.DISPLAY_AUDIO_EFFECT_CONTROL_PANEL" />
         </intent>
+        <!-- Spotify app queries -->
+        <package android:name="com.spotify.music" />
     </queries>
     <application
         android:name=".App"
@@ -114,6 +116,14 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
 
+            <!-- Spotify Authentication redirect -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.samify.music" android:host="callback" />
+            </intent-filter>
+
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
@@ -157,7 +167,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
-        </receiver>        
+        </receiver>
 
         <meta-data
             android:name="com.google.android.gms.car.application"

@@ -61,11 +61,10 @@ import com.samify.music.ui.screens.settings.AppearanceSettings
 import com.samify.music.ui.screens.settings.BackupAndRestore
 import com.samify.music.ui.screens.settings.ContentSettings
 import com.samify.music.ui.screens.settings.DarkMode
-import com.samify.music.ui.screens.settings.DiscordLoginScreen
-import com.samify.music.ui.screens.settings.DiscordSettings
 import com.samify.music.ui.screens.settings.PlayerSettings
 import com.samify.music.ui.screens.settings.PrivacySettings
 import com.samify.music.ui.screens.settings.SettingsScreen
+import com.samify.music.ui.screens.settings.SpotifyImportScreen
 import com.samify.music.ui.screens.settings.StorageSettings
 import com.samify.music.ui.utils.ShowMediaInfo
 import com.samify.music.utils.rememberEnumPreference
@@ -302,11 +301,10 @@ fun NavGraphBuilder.navigationBuilder(
     composable("settings/backup_restore") {
         BackupAndRestore(navController, scrollBehavior)
     }
-    composable("settings/discord") {
-        DiscordSettings(navController, scrollBehavior)
-    }
-    composable("settings/discord/login") {
-        DiscordLoginScreen(navController)
+    composable("settings/spotify_import") {
+        SpotifyImportScreen(
+            onNavigateUp = { navController.popBackStack() }
+        )
     }
     composable("settings/about") {
         AboutScreen(navController, scrollBehavior)

@@ -252,6 +252,17 @@ constructor(
             .flatMapLatest { (sortType, descending) ->
                 database.playlists(sortType, descending)
             }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+            .also { flow ->
+                // Debug logging
+                viewModelScope.launch {
+                    flow.collect { playlists ->
+                        android.util.Log.d("LibraryPlaylistsViewModel", "📚 Found ${playlists.size} playlists in Library")
+                        playlists.forEach { playlist ->
+                            android.util.Log.d("LibraryPlaylistsViewModel", "  - ${playlist.playlist.name} (ID: ${playlist.id}, bookmarkedAt: ${playlist.playlist.bookmarkedAt})")
+                        }
+                    }
+                }
+            }
 
     fun sync() {
         viewModelScope.launch(Dispatchers.IO) { syncUtils.syncSavedPlaylists() }

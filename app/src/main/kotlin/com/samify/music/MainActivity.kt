@@ -197,6 +197,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var syncUtils: SyncUtils
 
+    @Inject
+    lateinit var spotifyAuthManager: com.samify.music.spotify.SpotifyAuthManager
+
     private lateinit var navController: NavHostController
     private var pendingIntent: Intent? = null
     private var latestVersionName by mutableStateOf(BuildConfig.VERSION_NAME)
@@ -250,10 +253,84 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        
+        // Handle Spotify authentication redirect
+        if (intent.data?.scheme == "com.samify.music" && intent.data?.host == "callback") {
+            android.util.Log.d("MainActivity", "Spotify auth redirect detected: ${intent.data}")
+            handleSpotifyAuthCallback(intent)
+            return
+        }
+        
         if (::navController.isInitialized) {
             handleDeepLinkIntent(intent, navController)
         } else {
             pendingIntent = intent
+        }
+    }
+
+    private fun handleSpotifyAuthCallback(intent: Intent) {
+        val uri = intent.data
+        android.util.Log.d("MainActivity", "Spotify callback received: $uri")
+        
+        if (uri != null) {
+            // Check for authorization code in query parameters (standard flow)
+            val code = uri.getQueryParameter("code")
+            val error = uri.getQueryParameter("error")
+            
+            when {
+                error != null -> {
+                    android.util.Log.e("MainActivity", "Spotify auth error: $error")
+                    spotifyAuthManager.handleWebAuthError(error)
+                    return
+                }
+                code != null -> {
+                    android.util.Log.d("MainActivity", "Received authorization code: ${code.take(10)}...")
+                    spotifyAuthManager.handleAuthorizationCode(code)
+                    return
+                }
+            }
+            
+            // Fallback: Check for access token in fragment (implicit grant)
+            val fragment = uri.fragment
+            android.util.Log.d("MainActivity", "URI fragment: $fragment")
+            
+            if (fragment != null) {
+                val params = fragment.split("&").associate {
+                    val parts = it.split("=", limit = 2)
+                    if (parts.size == 2) {
+                        parts[0] to parts[1]
+                    } else {
+                        parts[0] to ""
+                    }
+                }
+                
+                android.util.Log.d("MainActivity", "Fragment params: $params")
+                
+                val accessToken = params["access_token"]
+                val expiresIn = params["expires_in"]?.toIntOrNull()
+                val fragmentError = params["error"]
+                
+                when {
+                    fragmentError != null -> {
+                        android.util.Log.e("MainActivity", "Spotify auth error in fragment: $fragmentError")
+                        spotifyAuthManager.handleWebAuthError(fragmentError)
+                    }
+                    accessToken != null && expiresIn != null -> {
+                        android.util.Log.d("MainActivity", "Spotify auth success from fragment")
+                        spotifyAuthManager.handleWebAuthSuccess(accessToken, expiresIn)
+                    }
+                    else -> {
+                        android.util.Log.e("MainActivity", "Invalid Spotify auth response - no code or token found")
+                        spotifyAuthManager.handleWebAuthError("Invalid response - no authorization code or access token found")
+                    }
+                }
+            } else {
+                android.util.Log.e("MainActivity", "No fragment found in URI")
+                spotifyAuthManager.handleWebAuthError("Invalid redirect URI format")
+            }
+        } else {
+            android.util.Log.e("MainActivity", "No URI data in intent")
+            spotifyAuthManager.handleWebAuthError("No URI data received")
         }
     }
 
@@ -576,16 +653,34 @@ class MainActivity : ComponentActivity() {
 
                     LaunchedEffect(Unit) {
                         if (pendingIntent != null) {
-                            handleDeepLinkIntent(pendingIntent!!, navController)
+                            // Check if pending intent is Spotify auth callback
+                            if (pendingIntent!!.data?.scheme == "com.samify.music" && pendingIntent!!.data?.host == "callback") {
+                                android.util.Log.d("MainActivity", "Handling pending Spotify auth callback: ${pendingIntent!!.data}")
+                                handleSpotifyAuthCallback(pendingIntent!!)
+                            } else {
+                                handleDeepLinkIntent(pendingIntent!!, navController)
+                            }
                             pendingIntent = null
                         } else {
-                            handleDeepLinkIntent(intent, navController)
+                            // Check if initial intent is Spotify auth callback
+                            if (intent.data?.scheme == "samify" && intent.data?.host == "spotify-auth") {
+                                android.util.Log.d("MainActivity", "Handling initial Spotify auth callback: ${intent.data}")
+                                handleSpotifyAuthCallback(intent)
+                            } else {
+                                handleDeepLinkIntent(intent, navController)
+                            }
                         }
                     }
 
                     DisposableEffect(Unit) {
                         val listener = Consumer<Intent> { intent ->
-                            handleDeepLinkIntent(intent, navController)
+                            // Check if new intent is Spotify auth callback
+                            if (intent.data?.scheme == "samify" && intent.data?.host == "spotify-auth") {
+                                android.util.Log.d("MainActivity", "Handling new Spotify auth callback: ${intent.data}")
+                                handleSpotifyAuthCallback(intent)
+                            } else {
+                                handleDeepLinkIntent(intent, navController)
+                            }
                         }
 
                         addOnNewIntentListener(listener)
@@ -638,7 +733,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                             IconButton(onClick = { showAccountDialog = true }) {
                                                 BadgedBox(badge = {
-                                                    if (latestVersionName != BuildConfig.VERSION_NAME) {
+                                                    if (isNewerVersion(BuildConfig.VERSION_NAME, latestVersionName)) {
                                                         Badge()
                                                     }
                                                 }) {
@@ -1136,6 +1231,37 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             window.navigationBarColor =
                 (if (isDark) Color.Transparent else Color.Black.copy(alpha = 0.2f)).toArgb()
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        // Handle Spotify authentication result
+        if (requestCode == 1337) { // REQUEST_CODE from SpotifyAuthManager
+            val response = com.spotify.sdk.android.auth.AuthorizationClient.getResponse(resultCode, data)
+            spotifyAuthManager.handleAuthResponse(resultCode, response)
+        }
+    }
+
+    private fun isNewerVersion(currentVersion: String, latestVersion: String): Boolean {
+        return try {
+            val current = currentVersion.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+            val latest = latestVersion.removePrefix("v").split(".").map { it.toIntOrNull() ?: 0 }
+            
+            val maxLength = maxOf(current.size, latest.size)
+            val currentPadded = current + List(maxLength - current.size) { 0 }
+            val latestPadded = latest + List(maxLength - latest.size) { 0 }
+            
+            for (i in 0 until maxLength) {
+                when {
+                    latestPadded[i] > currentPadded[i] -> return true
+                    latestPadded[i] < currentPadded[i] -> return false
+                }
+            }
+            false
+        } catch (e: Exception) {
+            false
         }
     }
 

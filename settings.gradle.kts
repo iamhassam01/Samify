@@ -19,7 +19,6 @@ include(":app")
 include(":innertube")
 include(":kugou")
 include(":lrclib")
-include(":kizzy")
 
 // Use a local copy of NewPipe Extractor by uncommenting the lines below.
 // We assume, that Samify and NewPipe Extractor have the same parent directory.

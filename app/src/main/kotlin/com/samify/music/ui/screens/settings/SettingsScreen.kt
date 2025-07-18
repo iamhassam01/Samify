@@ -29,6 +29,35 @@ import com.samify.music.ui.component.PreferenceEntry
 import com.samify.music.ui.component.ReleaseNotesCard
 import com.samify.music.ui.utils.backToMain
 
+/**
+ * Compares two version strings to determine if newVersion is newer than currentVersion
+ * @param currentVersion The current app version (e.g., "2.0.0")
+ * @param newVersion The version to compare against (e.g., "1.5.0")
+ * @return true if newVersion is newer than currentVersion
+ */
+private fun isNewerVersion(currentVersion: String, newVersion: String): Boolean {
+    try {
+        val currentParts = currentVersion.split(".").map { it.toIntOrNull() ?: 0 }
+        val newParts = newVersion.split(".").map { it.toIntOrNull() ?: 0 }
+        
+        val maxLength = maxOf(currentParts.size, newParts.size)
+        for (i in 0 until maxLength) {
+            val currentPart = currentParts.getOrElse(i) { 0 }
+            val newPart = newParts.getOrElse(i) { 0 }
+            
+            when {
+                newPart > currentPart -> return true
+                newPart < currentPart -> return false
+                // Continue to next part if equal
+            }
+        }
+        return false // Versions are equal
+    } catch (e: Exception) {
+        // Fallback to string comparison if parsing fails
+        return newVersion != currentVersion
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -83,6 +112,11 @@ fun SettingsScreen(
             icon = { Icon(painterResource(R.drawable.restore), null) },
             onClick = { navController.navigate("settings/backup_restore") }
         )
+        PreferenceEntry(
+            title = { Text("Import from Spotify") },
+            icon = { Icon(painterResource(R.drawable.library_music), null) },
+            onClick = { navController.navigate("settings/spotify_import") }
+        )
         if (isAndroid12OrLater) {
             PreferenceEntry(
                 title = { Text(stringResource(R.string.default_links)) },
@@ -130,7 +164,7 @@ fun SettingsScreen(
             icon = { Icon(painterResource(R.drawable.info), null) },
             onClick = { navController.navigate("settings/about") }
         )
-        if (latestVersionName != BuildConfig.VERSION_NAME) {
+        if (isNewerVersion(BuildConfig.VERSION_NAME, latestVersionName)) {
             PreferenceEntry(
                 title = {
                     Text(

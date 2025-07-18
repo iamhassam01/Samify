@@ -18,11 +18,15 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 2
-        versionName = "1.5.0"
+        versionName = "2.0.0"
 
         multiDexEnabled = true
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
+
+        // Spotify SDK manifest placeholders
+        manifestPlaceholders["redirectHostName"] = "spotify-auth"
+        manifestPlaceholders["redirectSchemeName"] = "samify"
     }
 
     flavorDimensions += "abi"
@@ -183,10 +187,16 @@ dependencies {
     implementation(project(":innertube"))
     implementation(project(":kugou"))
     implementation(project(":lrclib"))
-    implementation(project(":kizzy"))
 
     implementation(libs.ktor.client.core)
     implementation(libs.ktor.serialization.json)
+
+    // Spotify Android SDK
+    implementation("com.spotify.android:auth:2.1.0")
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
 
     coreLibraryDesugaring(libs.desugaring)
 
