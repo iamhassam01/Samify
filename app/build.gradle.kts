@@ -84,11 +84,19 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.getByName("persistentDebug")
+            
+            // Spotify API credentials - Add your actual credentials here
+            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"74a5eb8d3b654bb0b489c16850f82b58\"")
+            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"505029905ae54dc2b6f7d982705ae9fb\"")
         }
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
             signingConfig = signingConfigs.getByName("persistentDebug")
+            
+            // Spotify API credentials - Add your actual credentials here
+            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"74a5eb8d3b654bb0b489c16850f82b58\"")
+            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"505029905ae54dc2b6f7d982705ae9fb\"")
         }
     }
 

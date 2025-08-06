@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
 import androidx.activity.ComponentActivity
+import com.samify.music.BuildConfig
 import com.spotify.sdk.android.auth.AuthorizationClient
 import com.spotify.sdk.android.auth.AuthorizationRequest
 import com.spotify.sdk.android.auth.AuthorizationResponse
@@ -33,8 +34,9 @@ class SpotifyAuthManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        private const val CLIENT_ID = "74a5eb8d3b654bb0b489c16850f82b58"
-        private const val CLIENT_SECRET = "c7be19406b1e4668b92e213ffdaed50b" // We'll need to get this from Spotify dashboard
+        // Secure credentials from BuildConfig
+        private const val CLIENT_ID = BuildConfig.SPOTIFY_CLIENT_ID
+        private const val CLIENT_SECRET = BuildConfig.SPOTIFY_CLIENT_SECRET
         private const val REDIRECT_URI = "com.samify.music://callback"
         private const val REQUEST_CODE = 1337
         private const val PREFS_NAME = "spotify_auth"
