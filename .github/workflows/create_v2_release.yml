@@ -1,0 +1,152 @@
+name: Create v2.0.0 Release
+on:
+  workflow_dispatch:
+    inputs:
+      use_existing_apks:
+        description: 'Use existing v2.0.0 APK files from releases/ directory'
+        required: true
+        default: 'true'
+        type: boolean
+      rebuild_apks:
+        description: 'Rebuild APKs from source before creating release'
+        required: true
+        default: 'false'
+        type: boolean
+
+jobs:
+  create-v2-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up JDK 21
+        if: ${{ inputs.rebuild_apks }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      
+      - name: Set Up Gradle
+        if: ${{ inputs.rebuild_apks }}
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-cleanup: on-success
+          
+      - name: Grant execute permission for gradlew
+        if: ${{ inputs.rebuild_apks }}
+        run: chmod +x gradlew
+
+      - name: Build Release APKs
+        if: ${{ inputs.rebuild_apks }}
+        run: |
+          ./gradlew assembleUniversalRelease
+          ./gradlew assembleArm64Release
+          ./gradlew assembleArmeabiRelease
+          ./gradlew assembleX86Release
+          ./gradlew assembleX86_64Release
+        env:
+          PULL_REQUEST: 'false'
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+
+      - name: Sign APKs
+        if: ${{ inputs.rebuild_apks }}
+        uses: ilharp/sign-android-release@v2.0.0
+        with:
+          releaseDir: app/build/outputs/apk/
+          signingKey: ${{ secrets.KEYSTORE }}
+          keyAlias: ${{ secrets.KEY_ALIAS }}
+          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword: ${{ secrets.KEY_PASSWORD }}
+          buildToolsVersion: 35.0.0
+
+      - name: Move signed APKs to releases directory
+        if: ${{ inputs.rebuild_apks }}
+        run: |
+          mkdir -p releases
+          find app/build/outputs/apk -name "*-signed.apk" | while read apk; do
+            filename=$(basename "$apk")
+            variant=$(echo "$apk" | grep -oE "(universal|arm64|armeabi|x86_64|x86)/" | tr -d '/')
+            mv "$apk" "releases/Samify-v2.0.0-${variant}-signed.apk"
+          done
+
+      - name: Verify APK files exist
+        run: |
+          echo "Checking for v2.0.0 APK files..."
+          ls -la releases/Samify-v2.0.0-*.apk
+          
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="2.0.0"
+          TAG="v${VERSION}"
+          RELEASE_TITLE="Release v2.0.0 - Spotify Integration and Enhanced Music Experience"
+          
+          # Release notes following v1.5.0 pattern
+          RELEASE_NOTES="Release v2.0.0 - Spotify Integration and Enhanced Music Experience
+
+          **Features:**
+          🎵 **Full Spotify Integration**
+          - Native Spotify account authentication and login support
+          - Import playlists directly from your Spotify account
+          - Seamless synchronization of your Spotify music library
+          - Support for both private and collaborative playlists
+          - Advanced playlist import with intelligent track matching
+
+          🎨 **Enhanced User Interface**
+          - New Spotify integration screens with modern design
+          - Improved playlist management interface
+          - Better authentication flow with secure OAuth2 implementation
+          - Enhanced library management with Spotify content
+
+          🔐 **Security & Authentication**
+          - Secure Spotify OAuth2 authentication with PKCE
+          - Safe token management and refresh capabilities
+          - Privacy-focused authentication flow
+          - Secure API communication with Spotify services
+
+          **Technical Improvements:**
+          🛠 **Spotify SDK Integration**
+          - Added Spotify Android SDK (v2.1.0) for native authentication
+          - Implemented Retrofit2 for robust API communication
+          - Enhanced OkHttp client with logging and security features
+          - Modern Kotlin coroutines integration for async operations
+
+          🏗 **Architecture Enhancements**
+          - New Spotify service layer with dependency injection
+          - Enhanced repository pattern for music data management
+          - Improved error handling and state management
+          - Better separation of concerns with dedicated Spotify modules
+
+          ⚡ **Performance Optimizations**
+          - Optimized playlist import with background processing
+          - Improved track matching algorithms
+          - Better memory management for large playlist imports
+          - Enhanced caching mechanisms for Spotify data
+
+          **Release Builds:**
+          📱 Universal APK for all devices (recommended for most users)
+          🏗 Architecture-specific APKs for optimal performance:
+          - ARM64 (arm64-v8a) - Modern 64-bit ARM devices
+          - ARMv7 (armeabi-v7a) - Older ARM devices
+          - x86 - Intel-based Android devices
+          - x86_64 - 64-bit Intel-based devices
+
+          **Version Information:**
+          - Version bump from 1.5.0 to 2.0.0
+          - Target SDK: 36 (Android 15+)
+          - Minimum SDK: 26 (Android 8.0+)
+          - Compiled with latest Kotlin and Gradle toolchain
+
+          **Installation Notes:**
+          ⚠️ **Important:** This version requires Spotify account authentication for the new import features. Existing local functionality remains unchanged and doesn't require Spotify integration."
+          
+          # Create the release
+          gh release create "$TAG" \
+            --title "$RELEASE_TITLE" \
+            --notes "$RELEASE_NOTES" \
+            releases/Samify-v2.0.0-universal-signed.apk \
+            releases/Samify-v2.0.0-arm64-signed.apk \
+            releases/Samify-v2.0.0-armeabi-signed.apk \
+            releases/Samify-v2.0.0-x86-signed.apk \
+            releases/Samify-v2.0.0-x86_64-signed.apk
