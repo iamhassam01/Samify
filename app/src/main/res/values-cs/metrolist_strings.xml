@@ -68,7 +68,6 @@
     <string name="show_top_playlist">Zobrazit playlist „Nejlepší“</string>
     <string name="show_cached_playlist">Zobrazit playlist „V mezipaměti“</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Přihlásit se pomocí tokenu</string>
     <string name="token_hidden">Klepněte pro zobrazení tokenu</string>
     <string name="token_shown">Klepněte znovu pro kopírování nebo úpravu</string>

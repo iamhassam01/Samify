@@ -68,7 +68,6 @@
     <string name="show_top_playlist">En İyi Çalma Listesini Göster</string>
     <string name="show_cached_playlist">Önbelleğe Alınan Çalma Listesini Göster</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Gelişmiş giriş (token)</string>
     <string name="token_hidden">Tokeni göstermek için dokunun</string>
     <string name="token_shown">Kopyalamak veya düzenlemek için tekrar dokunun</string>

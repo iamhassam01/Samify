@@ -2,7 +2,6 @@
 <resources>
     <string name="lyrics_auto_scroll">Letras sincronizadas</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Inicio de sesión avanzado (por token)</string>
     <string name="token_hidden">Presiona para mostrar el token</string>
     <string name="token_shown">Presiona de nuevo para copiar o editar</string>

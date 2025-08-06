@@ -67,7 +67,6 @@
     <string name="slim_navbar">隐藏底部导航栏标签</string>
     <string name="show_cached_playlist">显示缓存播放列表</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">高级登录 (token)</string>
     <string name="token_hidden">点击显示 token</string>
     <string name="token_shown">再次点击以复制或编辑</string>

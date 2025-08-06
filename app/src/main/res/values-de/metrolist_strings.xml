@@ -25,7 +25,6 @@
     <string name="slim">Schlank</string>
     <string name="slim_navbar">Beschriftungen in der unteren Navigationsleiste ausblenden</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Erweiterte Anmeldung (Token)</string>
     <string name="token_hidden">Tippen, um Token anzuzeigen</string>
     <string name="token_shown">Tippen, um zu kopieren oder zu bearbeiten</string>

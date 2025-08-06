@@ -45,7 +45,6 @@
     <string name="lyrics_click_change">Змінити текст пісні при натисканні</string>
     <string name="slim_navbar">Приховати мітки нижньої панелі навігації</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Просунутий вхід (токен)</string>
     <string name="token_hidden">Натисніть для показу токену</string>
     <string name="token_shown">Повторно натисніть, щоб скопіювати або редагувати</string>

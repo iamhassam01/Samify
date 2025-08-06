@@ -85,7 +85,6 @@
     <string name="show_top_playlist">\"Top\" lejátszásilista megjelenítése</string>
     <string name="show_cached_playlist">\"Gyorsítótárazott\" lejátszásilista megjelenítése</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Bejelentkezés tokennel</string>
     <string name="token_hidden">Koppintson a token megjelenítéséhez</string>
     <string name="token_shown">Koppintson még egyszer a másoláshoz vagy szerkesztéshez</string>

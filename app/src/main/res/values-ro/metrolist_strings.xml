@@ -84,7 +84,6 @@
     <string name="show_top_playlist">Arată playlist-ul \"Top\"</string>
     <string name="show_cached_playlist">Arată playlist-ul \"În cache\"</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Autentifică-te cu token</string>
     <string name="token_hidden">Atinge pentru a afișa token-ul</string>
     <string name="token_shown">Atinge din nou pentru a-l copia sau edita</string>

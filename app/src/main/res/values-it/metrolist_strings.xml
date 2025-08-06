@@ -70,7 +70,6 @@
     <string name="show_top_playlist">Mostra la Playlist dei migliori brani</string>
     <string name="show_cached_playlist">Mostra la Playlist dei brani in cache</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Login con il token</string>
     <string name="token_hidden">Tocca per mostrare il token</string>
     <string name="token_shown">Tocca ancora per copiarlo o modificarlo</string>

@@ -89,7 +89,6 @@
     <string name="secondary_text_color">لون النص الثانوي</string>
     <string name="background_color">لون الخلفية</string>
     <string name="google">جوجل</string>
-    <string name="discord">ديسكورد</string>
     <string name="advanced_login">تسجيل الدخول باستخدام token</string>
     <string name="token_hidden">اضغط لعرض ال Token</string>
     <string name="token_shown">اضغط مرة أخرى للنسخ أو التعديل</string>

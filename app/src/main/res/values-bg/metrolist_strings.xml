@@ -73,7 +73,6 @@
     <string name="show_top_playlist">Покажи плейлист \"Топ\"</string>
     <string name="show_cached_playlist">Покажи плейлист \"Кеширани\"</string>
     <string name="google">Гугъл</string>
-    <string name="discord">Дискорд</string>
     <string name="advanced_login">Вход с токен</string>
     <string name="token_hidden">Натисни за показване на токен</string>
     <string name="token_shown">Натисни отново за копиране или редакция</string>

@@ -19,7 +19,6 @@
     <string name="swipe_song_to_add">Проведите пальцем по песне влево, чтобы добавить ее в очередь, или вправо, чтобы воспроизвести ее следующей</string>
     <string name="slim">Тонкий</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="token_hidden">Нажмите, чтобы показать токен</string>
     <string name="token_shown">Нажмите еще раз, чтобы скопировать или изменить</string>
     <string name="ytm_sync">Авто-синхронизация с аккаунтом YouTube Music</string>

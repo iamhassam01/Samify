@@ -44,7 +44,6 @@
     <string name="remove_from_cache">Hapus dari cache</string>
     <string name="select">Pilih semua</string>
     <string name="cancel">Batal</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Login (dengan token)</string>
     <string name="token_hidden">Ketuk untuk menampilkan token</string>
     <string name="token_shown">Ketuk lagi untuk menyalin atau mengedit</string>

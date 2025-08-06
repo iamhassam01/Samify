@@ -70,7 +70,6 @@
     <string name="show_top_playlist">Ver tu playlist de \'Top\'</string>
     <string name="show_cached_playlist">Ver tu playlist en caché</string>
     <string name="google">Google</string>
-    <string name="discord">Discord</string>
     <string name="advanced_login">Iniciar sesión con token</string>
     <string name="token_hidden">Toca para mostrar el token</string>
     <string name="token_shown">Toca de nuevo para copiar o editar</string>
