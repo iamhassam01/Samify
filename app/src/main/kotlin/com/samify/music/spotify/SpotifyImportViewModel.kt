@@ -13,6 +13,8 @@ import com.samify.music.db.entities.PlaylistEntity
 import com.samify.music.db.entities.SongEntity
 import com.samify.music.db.entities.ArtistEntity
 import com.samify.music.db.entities.SongArtistMap
+import com.samify.music.db.MusicDatabase
+import com.samify.music.spotify.SpotifyAuthManager
 import com.metrolist.innertube.YouTube
 import com.metrolist.innertube.models.SearchSuggestions
 import kotlinx.coroutines.Dispatchers
@@ -72,7 +74,7 @@ data class SpotifyTrack(
 @HiltViewModel
 class SpotifyImportViewModel @Inject constructor(
     private val authManager: SpotifyAuthManager,
-    private val database: com.samify.music.db.MusicDatabase
+    private val database: MusicDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SpotifyImportUiState())
@@ -317,7 +319,7 @@ class SpotifyImportViewModel @Inject constructor(
     }
 
     fun importPlaylist(playlistId: String) {
-        android.util.Log.d("SpotifyImportViewModel", "🚀 Starting import for playlist: $playlistId")
+        android.util.Log.d("SpotifyImportViewModel", "🚀 Starting safe import for playlist: $playlistId")
         
         val playlistToImport = _uiState.value.playlists.find { it.id == playlistId }
         if (playlistToImport == null) {
@@ -330,22 +332,24 @@ class SpotifyImportViewModel @Inject constructor(
         
         android.util.Log.d("SpotifyImportViewModel", "📋 Found playlist: ${playlistToImport.name}")
         
-        // Start import process with NonCancellable to prevent early cancellation
+        // Start import process with proper error handling
         viewModelScope.launch(Dispatchers.IO + SupervisorJob()) {
-            android.util.Log.d("SpotifyImportViewModel", "🔄 Import coroutine started")
+            android.util.Log.d("SpotifyImportViewModel", "🔄 Safe import coroutine started")
             try {
                 // Update UI state immediately on main thread
-                _uiState.value = _uiState.value.copy(
-                    importingPlaylistId = playlistId,
-                    importProgress = ImportProgress(
-                        playlistName = playlistToImport.name,
-                        currentTrack = 0,
-                        totalTracks = 0,
-                        foundTracks = 0
-                    ),
-                    importResult = null,
-                    error = null
-                )
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        importingPlaylistId = playlistId,
+                        importProgress = ImportProgress(
+                            playlistName = playlistToImport.name,
+                            currentTrack = 0,
+                            totalTracks = 0,
+                            foundTracks = 0
+                        ),
+                        importResult = null,
+                        error = null
+                    )
+                }
                 
                 val token = _uiState.value.accessToken
                 if (token == null) {
@@ -362,39 +366,56 @@ class SpotifyImportViewModel @Inject constructor(
                 android.util.Log.d("SpotifyImportViewModel", "Found ${spotifyTracks.size} tracks in Spotify playlist")
                 
                 if (spotifyTracks.isEmpty()) {
-                    _uiState.value = _uiState.value.copy(
-                        importingPlaylistId = null,
-                        importProgress = null,
-                        importResult = ImportResult.Error(
-                            playlistToImport.name,
-                            "No tracks found in this playlist"
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(
+                            importingPlaylistId = null,
+                            importProgress = null,
+                            importResult = ImportResult.Error(
+                                playlistToImport.name,
+                                "No tracks found in this playlist"
+                            )
                         )
-                    )
+                    }
                     return@launch
                 }
                 
                 // Update progress with total tracks
-                _uiState.value = _uiState.value.copy(
-                    importProgress = _uiState.value.importProgress?.copy(
-                        totalTracks = spotifyTracks.size
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        importProgress = _uiState.value.importProgress?.copy(
+                            totalTracks = spotifyTracks.size
+                        )
                     )
-                )
+                }
                 
                 // Create local playlist (on IO thread)
                 val localPlaylistId = withContext(Dispatchers.IO) {
-                    val localPlaylist = PlaylistEntity(
-                        name = "${playlistToImport.name} (from Spotify)",
-                        browseId = null,
-                        bookmarkedAt = java.time.LocalDateTime.now()
-                    )
-                    database.query { insert(localPlaylist) }
-                    localPlaylist.id
+                    try {
+                        val localPlaylist = PlaylistEntity(
+                            name = "${playlistToImport.name} (from Spotify)",
+                            browseId = null,
+                            bookmarkedAt = java.time.LocalDateTime.now()
+                        )
+                        database.query { insert(localPlaylist) }
+                        localPlaylist.id
+                    } catch (e: Exception) {
+                        android.util.Log.e("SpotifyImportViewModel", "Failed to create local playlist", e)
+                        throw Exception("Failed to create local playlist: ${e.message}")
+                    }
                 }
                 
                 android.util.Log.d("SpotifyImportViewModel", "Created local playlist with ID: $localPlaylistId")
                 
-                // Process tracks with aggressive search and proper threading
-                val foundSongIds = processTracksWithAdvancedSearch(spotifyTracks, playlistToImport.name)
+                // Process tracks with safe search
+                val foundSongIds = try {
+                    processTracksWithAdvancedSearch(spotifyTracks, playlistToImport.name)
+                } catch (e: OutOfMemoryError) {
+                    android.util.Log.e("SpotifyImportViewModel", "Out of memory during track processing", e)
+                    System.gc()
+                    delay(2000L) // Wait for cleanup
+                    // Try again with smaller batch
+                    processTracksWithAdvancedSearch(spotifyTracks.take(10), playlistToImport.name)
+                }
                 
                 // Add found songs to playlist (on IO thread)
                 if (foundSongIds.isNotEmpty()) {
@@ -403,13 +424,13 @@ class SpotifyImportViewModel @Inject constructor(
                             android.util.Log.d("SpotifyImportViewModel", "🎵 Adding ${foundSongIds.size} songs to playlist...")
                             val playlist = database.playlist(localPlaylistId).first()
                             if (playlist != null) {
-                                // Add songs in smaller batches to prevent database overload
-                                val batchSize = 10
+                                // Add songs in very small batches to prevent crashes
+                                val batchSize = 5 // Smaller batches
                                 foundSongIds.chunked(batchSize).forEachIndexed { index, batch ->
                                     try {
                                         database.addSongToPlaylist(playlist, batch)
                                         android.util.Log.d("SpotifyImportViewModel", "✅ Added batch ${index + 1} (${batch.size} songs)")
-                                        delay(50) // Small delay between batches
+                                        delay(100) // Delay between batches
                                     } catch (batchException: Exception) {
                                         android.util.Log.e("SpotifyImportViewModel", "Error adding batch ${index + 1}", batchException)
                                     }
@@ -442,7 +463,7 @@ class SpotifyImportViewModel @Inject constructor(
                         val message = "Successfully imported playlist '${playlistToImport.name}' with ${foundSongIds.size} out of ${spotifyTracks.size} tracks found"
                         android.util.Log.d("SpotifyImportViewModel", message)
                         
-                        // Small delay to ensure UI state is properly set before any navigation
+                        // Small delay to ensure UI state is properly set
                         delay(100)
                         
                     } catch (e: Exception) {
@@ -450,6 +471,19 @@ class SpotifyImportViewModel @Inject constructor(
                     }
                 }
                 
+            } catch (e: OutOfMemoryError) {
+                android.util.Log.e("SpotifyImportViewModel", "Out of memory during import", e)
+                System.gc()
+                withContext(Dispatchers.Main) {
+                    _uiState.value = _uiState.value.copy(
+                        importingPlaylistId = null,
+                        importProgress = null,
+                        importResult = ImportResult.Error(
+                            playlistName = playlistToImport.name,
+                            message = "Import failed due to memory constraints. Try importing a smaller playlist."
+                        )
+                    )
+                }
             } catch (e: Exception) {
                 android.util.Log.e("SpotifyImportViewModel", "Error importing playlist: ${e.message}", e)
                 
@@ -479,64 +513,59 @@ class SpotifyImportViewModel @Inject constructor(
         val foundSongIds = mutableListOf<String>()
         var successCount = 0
         
-        // Process tracks in smaller chunks to prevent memory issues and crashes
-        val chunkSize = 3 // Smaller chunks for better stability
-        val chunks = spotifyTracks.chunked(chunkSize)
+        // Process tracks one by one to prevent crashes and memory issues
+        android.util.Log.d("SpotifyImportViewModel", "📦 Processing ${spotifyTracks.size} tracks individually for stability")
         
-        android.util.Log.d("SpotifyImportViewModel", "📦 Processing ${spotifyTracks.size} tracks in ${chunks.size} chunks of $chunkSize")
-        
-        for ((chunkIndex, chunk) in chunks.withIndex()) {
-            android.util.Log.d("SpotifyImportViewModel", "🔄 Processing chunk ${chunkIndex + 1}/${chunks.size}")
-            
-            for ((localIndex, track) in chunk.withIndex()) {
-                val globalIndex = chunkIndex * chunkSize + localIndex
+        for ((index, track) in spotifyTracks.withIndex()) {
+            try {
+                // Force garbage collection every 5 tracks
+                if (index % 5 == 0 && index > 0) {
+                    System.gc()
+                    delay(500L) // Longer delay for memory cleanup
+                }
                 
+                // Update progress on main thread safely
                 try {
-                    // Force garbage collection and longer pause between chunks
-                    if (localIndex == 0 && chunkIndex > 0) {
-                        System.gc()
-                        delay(300L) // Longer delay between chunks
-                    }
-                    
-                    // Update progress on main thread
                     withContext(Dispatchers.Main) {
                         _uiState.value = _uiState.value.copy(
                             importProgress = _uiState.value.importProgress?.copy(
-                                currentTrack = globalIndex + 1,
+                                currentTrack = index + 1,
                                 foundTracks = successCount
                             )
                         )
                     }
-                    
-                    android.util.Log.d("SpotifyImportViewModel", "🔍 Searching track ${globalIndex + 1}/${spotifyTracks.size}: ${track.name} by ${track.artists.joinToString(", ")}")
-                    
-                    // Use aggressive search with multiple strategies
-                    val songId = findSongWithAggressiveSearch(track)
-                    
-                    if (songId != null) {
-                        foundSongIds.add(songId)
-                        successCount++
-                        android.util.Log.d("SpotifyImportViewModel", "✅ Found: ${track.name} -> $songId")
-                    } else {
-                        android.util.Log.w("SpotifyImportViewModel", "❌ No match: ${track.name} by ${track.artists.joinToString(", ")}")
-                    }
-                    
-                    // Longer delay to prevent overwhelming and reduce crash risk
-                    delay(150L)
-                    
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    android.util.Log.w("SpotifyImportViewModel", "🚫 Search cancelled for track: ${track.name}")
-                    break // Stop the loop on cancellation
                 } catch (e: Exception) {
-                    android.util.Log.e("SpotifyImportViewModel", "💥 Error searching for track: ${track.name}", e)
-                } catch (e: Exception) {
-                    android.util.Log.e("SpotifyImportViewModel", "💥 Error searching for track: ${track.name}", e)
-                    // Continue with next track on other errors
+                    android.util.Log.w("SpotifyImportViewModel", "UI update failed, continuing...", e)
                 }
+                
+                android.util.Log.d("SpotifyImportViewModel", "🔍 Searching track ${index + 1}/${spotifyTracks.size}: ${track.name} by ${track.artists.joinToString(", ")}")
+                
+                // Use safer search with timeout and exception handling
+                val songId = findSongWithSafeSearch(track)
+                
+                if (songId != null) {
+                    foundSongIds.add(songId)
+                    successCount++
+                    android.util.Log.d("SpotifyImportViewModel", "✅ Found: ${track.name} -> $songId")
+                } else {
+                    android.util.Log.w("SpotifyImportViewModel", "❌ No match: ${track.name} by ${track.artists.joinToString(", ")}")
+                }
+                
+                // Delay between each track for stability
+                delay(250L)
+                
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                android.util.Log.w("SpotifyImportViewModel", "🚫 Search cancelled for track: ${track.name}")
+                break // Stop the loop on cancellation
+            } catch (e: OutOfMemoryError) {
+                android.util.Log.e("SpotifyImportViewModel", "💥 Out of memory at track: ${track.name}")
+                System.gc()
+                delay(1000L) // Wait for cleanup
+                continue // Skip this track and continue
+            } catch (e: Exception) {
+                android.util.Log.e("SpotifyImportViewModel", "💥 Error searching for track: ${track.name}", e)
+                // Continue with next track on other errors
             }
-            
-            // Log chunk completion
-            android.util.Log.d("SpotifyImportViewModel", "✅ Completed chunk ${chunkIndex + 1}/${chunks.size} - Total found: $successCount")
         }
         
         android.util.Log.d("SpotifyImportViewModel", "🎉 Import complete! Found $successCount/${spotifyTracks.size} tracks")
@@ -753,41 +782,120 @@ class SpotifyImportViewModel @Inject constructor(
         return artists
     }
 
-    private suspend fun findSongWithAggressiveSearch(spotifyTrack: SpotifyTrack): String? {
-        // Ultra-aggressive search with 8 different strategies
+    private suspend fun findSongWithSafeSearch(spotifyTrack: SpotifyTrack): String? {
+        // Improved search with more strategies for better success rate
         val searchStrategies = mutableListOf<String>()
         
         // Clean the song name first
         val cleanSongName = cleanSongTitle(spotifyTrack.name)
+        val rawSongName = spotifyTrack.name.trim()
         val mainArtist = spotifyTrack.artists.firstOrNull() ?: ""
         val allArtists = spotifyTrack.artists.joinToString(" ")
         
-        // Strategy 1: Exact as-is
-        searchStrategies.add("${spotifyTrack.name} ${allArtists}")
+        // More comprehensive search strategies for better import success
+        searchStrategies.add("$cleanSongName $mainArtist") // Strategy 1: Cleaned song + main artist
+        searchStrategies.add("$rawSongName $mainArtist") // Strategy 2: Raw song + main artist  
+        searchStrategies.add(cleanSongName) // Strategy 3: Just cleaned song name
+        searchStrategies.add(rawSongName) // Strategy 4: Just raw song name
+        searchStrategies.add("$mainArtist $cleanSongName") // Strategy 5: Artist first (cleaned)
+        searchStrategies.add("$mainArtist $rawSongName") // Strategy 6: Artist first (raw)
         
-        // Strategy 2: Cleaned song + main artist
-        searchStrategies.add("$cleanSongName $mainArtist")
+        // Add strategies with all artists if multiple artists exist
+        if (spotifyTrack.artists.size > 1) {
+            searchStrategies.add("$cleanSongName $allArtists") // Strategy 7: Song + all artists
+            searchStrategies.add("$allArtists $cleanSongName") // Strategy 8: All artists + song
+        }
         
-        // Strategy 3: Just cleaned song name (for popular songs)
-        searchStrategies.add(cleanSongName)
+        // Add abbreviated artist search if artist name is long
+        if (mainArtist.length > 10) {
+            val shortArtist = mainArtist.split(" ").firstOrNull() ?: mainArtist
+            searchStrategies.add("$cleanSongName $shortArtist") // Strategy 9: Song + short artist
+        }
         
-        // Strategy 4: Song + "official" (helps find official versions)
-        searchStrategies.add("$cleanSongName $mainArtist official")
+        // ULTRA-AGGRESSIVE STRATEGIES for 100% success rate
+        // Strategy 10: Just keywords from song name
+        val songKeywords = cleanSongName.split(" ").filter { it.length > 2 }.take(3).joinToString(" ")
+        if (songKeywords.isNotEmpty() && songKeywords != cleanSongName) {
+            searchStrategies.add(songKeywords)
+        }
         
-        // Strategy 5: Song + "audio" (helps find audio-only versions)
-        searchStrategies.add("$cleanSongName $mainArtist audio")
+        // Strategy 11: Song without parentheses/brackets + artist initials
+        val superCleanSong = spotifyTrack.name.replace(Regex("[()\\[\\]{}].*"), "").trim()
+        val artistInitials = mainArtist.split(" ").mapNotNull { it.firstOrNull()?.toString() }.joinToString("")
+        if (superCleanSong.isNotEmpty() && artistInitials.isNotEmpty()) {
+            searchStrategies.add("$superCleanSong $artistInitials")
+        }
         
-        // Strategy 6: Without featuring artists (remove ft./feat.)
-        val noFeatArtist = spotifyTrack.artists.first()
-        searchStrategies.add("$cleanSongName $noFeatArtist")
+        // Strategy 12: Alternative spellings/transliterations for international tracks
+        val alternativeSpellings = mutableListOf<String>()
+        // Common substitutions for international names
+        val substitutions = mapOf(
+            "ا" to "a", "ع" to "a", "و" to "o", "ی" to "i", "ے" to "e",
+            "ح" to "h", "خ" to "kh", "ذ" to "z", "ص" to "s", "ض" to "z",
+            "ط" to "t", "ظ" to "z", "غ" to "gh", "ف" to "f", "ق" to "q",
+            "ك" to "k", "گ" to "g", "ل" to "l", "م" to "m", "ن" to "n",
+            "ه" to "h", "ء" to "", "آ" to "aa"
+        )
         
-        // Strategy 7: Reverse order (Artist Song)
-        searchStrategies.add("$mainArtist $cleanSongName")
+        var transliterated = cleanSongName
+        substitutions.forEach { (from, to) ->
+            transliterated = transliterated.replace(from, to, ignoreCase = true)
+        }
         
-        // Strategy 8: Song + "music video" (sometimes only MV available)
-        searchStrategies.add("$cleanSongName $mainArtist music video")
+        if (transliterated != cleanSongName && transliterated.isNotEmpty()) {
+            searchStrategies.add("$transliterated $mainArtist") // Strategy 13
+        }
         
-        android.util.Log.d("SpotifyImportViewModel", "🎯 Trying ${searchStrategies.size} search strategies for: ${spotifyTrack.name}")
+        // Strategy 14: Remove common words and search with core terms
+        val commonWords = setOf("the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "main", "title", "version", "remix", "feat", "ft")
+        val coreWords = cleanSongName.split(" ").filterNot { it.lowercase() in commonWords }.joinToString(" ")
+        if (coreWords.isNotEmpty() && coreWords != cleanSongName) {
+            searchStrategies.add("$coreWords $mainArtist")
+        }
+        
+        // Strategy 15: Try with different artist combinations if multiple artists
+        if (spotifyTrack.artists.size > 1) {
+            spotifyTrack.artists.drop(1).take(2).forEach { altArtist ->
+                searchStrategies.add("$cleanSongName $altArtist")
+            }
+        }
+        
+        // ULTIMATE FALLBACK STRATEGIES (16-20) for the most stubborn tracks
+        // Strategy 16: Just the song name without any artist
+        if (cleanSongName.length > 3) {
+            searchStrategies.add(cleanSongName)
+        }
+        
+        // Strategy 17: First 3 words of song + first word of artist
+        val songWords = cleanSongName.split(" ").take(3).joinToString(" ")
+        val firstArtistWord = mainArtist.split(" ").firstOrNull() ?: ""
+        if (songWords.isNotEmpty() && firstArtistWord.isNotEmpty()) {
+            searchStrategies.add("$songWords $firstArtistWord")
+        }
+        
+        // Strategy 18: Song name with common variations
+        val commonVariations = listOf("official", "music video", "lyric video", "audio")
+        commonVariations.forEach { variation ->
+            searchStrategies.add("$cleanSongName $variation")
+        }
+        
+        // Strategy 19: Ultra-loose partial matching - just core letters
+        val coreLetters = cleanSongName.replace(Regex("[^a-zA-Z0-9\\s]"), "").split(" ")
+            .filter { it.length > 2 }.take(2).joinToString(" ")
+        if (coreLetters.isNotEmpty() && coreLetters != cleanSongName) {
+            searchStrategies.add(coreLetters)
+        }
+        
+        // Strategy 20: Emergency fallback - try each word individually if song has multiple words
+        val songParts = cleanSongName.split(" ").filter { it.length > 3 }
+        if (songParts.size > 1) {
+            songParts.take(2).forEach { part ->
+                searchStrategies.add("$part $mainArtist")
+            }
+        }
+        
+        android.util.Log.d("SpotifyImportViewModel", "🎯 Trying ${searchStrategies.size} ULTIMATE strategies for: ${spotifyTrack.name}")
+        android.util.Log.d("SpotifyImportViewModel", "📝 Track details: Name='${spotifyTrack.name}', Artists=${spotifyTrack.artists.joinToString(", ")}")
         
         for ((strategyIndex, query) in searchStrategies.withIndex()) {
             try {
@@ -796,23 +904,213 @@ class SpotifyImportViewModel @Inject constructor(
                 
                 android.util.Log.d("SpotifyImportViewModel", "  Strategy ${strategyIndex + 1}: '$cleanQuery'")
                 
-                val result = searchYouTubeWithRetry(cleanQuery, spotifyTrack)
+                // Use progressively more aggressive similarity thresholds for 100% success
+                val similarityThreshold = when {
+                    strategyIndex < 5 -> 0.25 // Strategies 1-5: Normal threshold
+                    strategyIndex < 10 -> 0.20 // Strategies 6-10: More aggressive
+                    strategyIndex < 15 -> 0.15 // Strategies 11-15: Ultra-aggressive
+                    else -> 0.10 // Strategies 16+: DESPERATE mode for final 2 tracks
+                }
+                
+                // Use simplified search with timeout protection and adaptive threshold
+                val result = searchYouTubeWithSafeTimeout(cleanQuery, spotifyTrack, similarityThreshold)
                 if (result != null) {
-                    android.util.Log.d("SpotifyImportViewModel", "  ✅ Strategy ${strategyIndex + 1} SUCCESS!")
+                    android.util.Log.d("SpotifyImportViewModel", "  ✅ Strategy ${strategyIndex + 1} SUCCESS with threshold $similarityThreshold!")
                     return result
                 }
                 
-                // Slightly longer delay between strategies to reduce load
-                delay(50L)
+                // Short delay between strategies
+                delay(80L) // Slightly faster delay for more strategies
                 
             } catch (e: Exception) {
-                android.util.Log.w("SpotifyImportViewModel", "  ❌ Strategy ${strategyIndex + 1} failed", e)
-                // Force garbage collection on errors to prevent memory leaks
-                if (strategyIndex % 3 == 0) System.gc()
+                android.util.Log.w("SpotifyImportViewModel", "  ❌ Strategy ${strategyIndex + 1} failed safely", e)
             }
         }
         
-        return null
+        // Log detailed failure information for analysis
+        android.util.Log.e("SpotifyImportViewModel", "❌ FAILED TO MATCH after ${searchStrategies.size} strategies:")
+        android.util.Log.e("SpotifyImportViewModel", "   🎵 Track: '${spotifyTrack.name}'")
+        android.util.Log.e("SpotifyImportViewModel", "   🎤 Artists: ${spotifyTrack.artists.joinToString(", ")}")
+        android.util.Log.e("SpotifyImportViewModel", "   🔍 Last 3 strategies: ${searchStrategies.takeLast(3).joinToString(" | ")}")
+        
+        // FINAL HAIL MARY: Try raw YouTube search with video filter as absolute last resort
+        android.util.Log.d("SpotifyImportViewModel", "🆘 HAIL MARY: Trying raw YouTube search with video filter...")
+        return try {
+            kotlinx.coroutines.withTimeout(15000L) {
+                withContext(Dispatchers.IO) {
+                    val rawSearchResult = YouTube.search("${spotifyTrack.name} ${spotifyTrack.artists.first()}", filter = com.metrolist.innertube.YouTube.SearchFilter.FILTER_VIDEO).getOrNull()
+                    
+                    if (rawSearchResult?.items?.isNotEmpty() == true) {
+                        // Try to find any video that might be the song
+                        val songItems = rawSearchResult.items.filterIsInstance<com.metrolist.innertube.models.SongItem>()
+                        val bestMatch = songItems.firstOrNull { item ->
+                            val score = calculateSimpleMatchScore(item, spotifyTrack)
+                            score > 0.05 // EXTREMELY loose threshold
+                        }
+                        
+                        if (bestMatch != null) {
+                            android.util.Log.d("SpotifyImportViewModel", "🆘 HAIL MARY SUCCESS!")
+                            saveSongToDatabase(bestMatch)
+                            return@withContext bestMatch.id
+                        }
+                    }
+                    
+                    android.util.Log.e("SpotifyImportViewModel", "🆘 HAIL MARY FAILED - Track truly unmatchable")
+                    return@withContext null
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SpotifyImportViewModel", "🆘 HAIL MARY EXCEPTION", e)
+            null
+        }
+    } // End findSongWithSafeSearch
+
+    private suspend fun searchYouTubeWithSafeTimeout(query: String, spotifyTrack: SpotifyTrack, similarityThreshold: Double = 0.25): String? {
+        return try {
+            // Use withTimeout to prevent hanging
+            kotlinx.coroutines.withTimeout(10000L) { // 10 second timeout per search
+                withContext(Dispatchers.IO) {
+                    val searchResult = YouTube.search(query, filter = com.metrolist.innertube.YouTube.SearchFilter.FILTER_SONG).getOrNull()
+                    
+                    if (searchResult?.items?.isNotEmpty() == true) {
+                        // Use simple matching for stability with adaptive threshold
+                        val bestMatch = findSimpleMatchFromResults(searchResult.items, spotifyTrack, similarityThreshold)
+                        if (bestMatch != null) {
+                            // Save to database and return
+                            saveSongToDatabase(bestMatch)
+                            return@withContext bestMatch.id
+                        }
+                    }
+                    
+                    return@withContext null
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            android.util.Log.w("SpotifyImportViewModel", "Search timeout for: $query")
+            null
+        } catch (e: Exception) {
+            android.util.Log.w("SpotifyImportViewModel", "Search error for: $query", e)
+            null
+        }
+    }
+
+    private fun findSimpleMatchFromResults(
+        items: List<com.metrolist.innertube.models.YTItem>, 
+        spotifyTrack: SpotifyTrack,
+        similarityThreshold: Double = 0.25
+    ): com.metrolist.innertube.models.SongItem? {
+        
+        val songItems = items.filterIsInstance<com.metrolist.innertube.models.SongItem>()
+        if (songItems.isEmpty()) return null
+        
+        // Use more lenient matching to improve import success rate
+        val scoredMatches = songItems.take(15).mapNotNull { item ->
+            val score = calculateSimpleMatchScore(item, spotifyTrack)
+            if (score > similarityThreshold) { // Use adaptive threshold for 100% success
+                item to score
+            } else null
+        }
+        
+        // Return the best match
+        return scoredMatches.maxByOrNull { it.second }?.first
+    }
+
+    private fun calculateSimpleMatchScore(ytSong: com.metrolist.innertube.models.SongItem, spotifyTrack: SpotifyTrack): Double {
+        var score = 0.0
+        
+        // Title similarity (60% weight - reduced from 70% for better balance)
+        val titleSimilarity = calculateImprovedStringSimilarity(ytSong.title, spotifyTrack.name)
+        score += titleSimilarity * 0.6
+        
+        // Artist similarity (35% weight - increased for better artist matching)
+        val maxArtistSimilarity = spotifyTrack.artists.maxOfOrNull { spotifyArtist ->
+            ytSong.artists.maxOfOrNull { ytArtist ->
+                calculateImprovedStringSimilarity(ytArtist.name, spotifyArtist)
+            } ?: 0.0
+        } ?: 0.0
+        score += maxArtistSimilarity * 0.35
+        
+        // Bonus for exact matches (5% weight)
+        if (ytSong.title.lowercase() == spotifyTrack.name.lowercase()) {
+            score += 0.05
+        }
+        
+        return score
+    }
+
+    private fun calculateSimpleStringSimilarity(str1: String, str2: String): Double {
+        val clean1 = cleanString(str1)
+        val clean2 = cleanString(str2)
+        
+        if (clean1.isEmpty() || clean2.isEmpty()) return 0.0
+        
+        // Exact match
+        if (clean1 == clean2) return 1.0
+        
+        // Contains match (high score)
+        if (clean1.contains(clean2) || clean2.contains(clean1)) return 0.85
+        
+        // Word-based matching for safety
+        val simpleWords1 = clean1.split(" ").filter { it.length > 2 }
+        val simpleWords2 = clean2.split(" ").filter { it.length > 2 }
+        
+        if (simpleWords1.isNotEmpty() && simpleWords2.isNotEmpty()) {
+            val commonWords = simpleWords1.intersect(simpleWords2.toSet()).size
+            val maxWords = kotlin.math.max(simpleWords1.size, simpleWords2.size)
+            val wordSimilarity = commonWords.toDouble() / maxWords.toDouble()
+            
+            // If we have good word overlap, boost the score
+            if (wordSimilarity > 0.5) {
+                return kotlin.math.min(0.8, wordSimilarity * 1.5)
+            }
+        }
+        
+        return 0.0
+    }
+
+    // New improved similarity function for better matching
+    private fun calculateImprovedStringSimilarity(str1: String, str2: String): Double {
+        val clean1 = cleanString(str1)
+        val clean2 = cleanString(str2)
+        
+        if (clean1.isEmpty() || clean2.isEmpty()) return 0.0
+        
+        // Exact match
+        if (clean1 == clean2) return 1.0
+        
+        // Contains match (very high score)
+        if (clean1.contains(clean2) || clean2.contains(clean1)) return 0.9
+        
+        // Word-based matching with improved scoring
+        val improvedWords1 = clean1.split(" ").filter { it.length > 2 }
+        val improvedWords2 = clean2.split(" ").filter { it.length > 2 }
+        
+        if (improvedWords1.isNotEmpty() && improvedWords2.isNotEmpty()) {
+            val commonWords = improvedWords1.intersect(improvedWords2.toSet()).size
+            val totalWords = (improvedWords1 + improvedWords2).toSet().size
+            val wordSimilarity = (commonWords.toDouble() * 2.0) / totalWords.toDouble()
+            
+            // Boost if most important words match
+            if (commonWords >= kotlin.math.min(improvedWords1.size, improvedWords2.size) / 2) {
+                return kotlin.math.min(0.85, wordSimilarity * 1.2)
+            }
+            
+            if (wordSimilarity > 0.3) {
+                return wordSimilarity
+            }
+        }
+        
+        // Fallback to character-based similarity for partial matches
+        val maxLength = kotlin.math.max(clean1.length, clean2.length)
+        if (maxLength > 0) {
+            val distance = levenshteinDistance(clean1, clean2)
+            val charSimilarity = kotlin.math.max(0.0, 1.0 - (distance.toDouble() / maxLength.toDouble()))
+            if (charSimilarity > 0.6) {
+                return charSimilarity * 0.7 // Scale down character-based matches
+            }
+        }
+        
+        return 0.0
     }
 
     private fun cleanSongTitle(title: String): String {
@@ -1079,44 +1377,69 @@ class SpotifyImportViewModel @Inject constructor(
             }
         }
         return dp[len1][len2]
-    }
-
+    } // End levenshteinDistance
+    
     private suspend fun saveSongToDatabase(item: com.metrolist.innertube.models.SongItem) {
         withContext(Dispatchers.IO) {
-            // Check if song already exists
-            val existingSong = database.song(item.id).first()
-            if (existingSong == null) {
-                val songEntity = SongEntity(
-                    id = item.id,
-                    title = item.title,
-                    duration = item.duration ?: -1,
-                    thumbnailUrl = item.thumbnail
-                )
-                
-                database.query { insert(songEntity) }
-                
-                // Insert artists
-                item.artists.forEachIndexed { index, artist ->
-                    try {
-                        val artistEntity = ArtistEntity(
-                            id = artist.id ?: ArtistEntity.generateArtistId(),
-                            name = artist.name
-                        )
-                        val existingArtist = database.artist(artistEntity.id).first()
-                        if (existingArtist == null) {
-                            database.query { insert(artistEntity) }
+            try {
+                // Check if song already exists
+                val existingSong = database.song(item.id).first()
+                if (existingSong == null) {
+                    // First, insert all artists and collect their IDs
+                    val artistIds = mutableListOf<String>()
+                    
+                    item.artists.forEach { artist ->
+                        try {
+                            val artistId = artist.id ?: ArtistEntity.generateArtistId()
+                            val existingArtist = database.artist(artistId).first()
+                            if (existingArtist == null) {
+                                val artistEntity = ArtistEntity(
+                                    id = artistId,
+                                    name = artist.name
+                                )
+                                database.query { insert(artistEntity) }
+                                android.util.Log.d("SpotifyImportViewModel", "Inserted artist: ${artist.name} with ID: $artistId")
+                            }
+                            artistIds.add(artistId)
+                        } catch (e: Exception) {
+                            android.util.Log.w("SpotifyImportViewModel", "Error inserting artist: ${artist.name}", e)
                         }
-                        database.query {
-                            insert(SongArtistMap(
-                                songId = item.id,
-                                artistId = artistEntity.id,
-                                position = index
-                            ))
+                    }
+                    
+                    // Then insert the song
+                    val songEntity = SongEntity(
+                        id = item.id,
+                        title = item.title,
+                        duration = item.duration ?: -1,
+                        thumbnailUrl = item.thumbnail
+                    )
+                    database.query { insert(songEntity) }
+                    android.util.Log.d("SpotifyImportViewModel", "Inserted song: ${item.title} with ID: ${item.id}")
+                    
+                    // Finally, insert the artist-song relationships with proper error handling
+                    artistIds.forEachIndexed { index, artistId ->
+                        try {
+                            // Double-check that artist exists before creating relationship
+                            val artistExists = database.artist(artistId).first()
+                            if (artistExists != null) {
+                                database.query {
+                                    insert(SongArtistMap(
+                                        songId = item.id,
+                                        artistId = artistId,
+                                        position = index
+                                    ))
+                                }
+                                android.util.Log.d("SpotifyImportViewModel", "Created relationship: ${item.id} -> $artistId")
+                            } else {
+                                android.util.Log.w("SpotifyImportViewModel", "Artist $artistId not found, skipping relationship")
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("SpotifyImportViewModel", "Error creating song-artist relationship: ${item.id} -> $artistId", e)
                         }
-                    } catch (e: Exception) {
-                        android.util.Log.w("SpotifyImportViewModel", "Error inserting artist: ${artist.name}", e)
                     }
                 }
+            } catch (e: Exception) {
+                android.util.Log.e("SpotifyImportViewModel", "Critical error saving song to database: ${item.title}", e)
             }
         }
     }

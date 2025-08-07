@@ -34,9 +34,9 @@ class SpotifyAuthManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        // Secure credentials from BuildConfig
-        private const val CLIENT_ID = BuildConfig.SPOTIFY_CLIENT_ID
-        private const val CLIENT_SECRET = BuildConfig.SPOTIFY_CLIENT_SECRET
+        // Using BuildConfig for secure credential management
+        private val CLIENT_ID = BuildConfig.SPOTIFY_CLIENT_ID
+        private val CLIENT_SECRET = BuildConfig.SPOTIFY_CLIENT_SECRET
         private const val REDIRECT_URI = "com.samify.music://callback"
         private const val REQUEST_CODE = 1337
         private const val PREFS_NAME = "spotify_auth"

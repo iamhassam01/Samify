@@ -1,4 +1,16 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+// Load local.properties for secure credential storage
+val localProperties = Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(localPropertiesFile.inputStream())
+}
+
+// Secure credential access with fallbacks
+val spotifyClientId = localProperties.getProperty("spotify.clientId") ?: "SPOTIFY_CLIENT_ID_NOT_FOUND"
+val spotifyClientSecret = localProperties.getProperty("spotify.clientSecret") ?: "SPOTIFY_CLIENT_SECRET_NOT_FOUND"
 
 plugins {
     id("com.android.application")
@@ -85,18 +97,18 @@ android {
             )
             signingConfig = signingConfigs.getByName("persistentDebug")
             
-            // Spotify API credentials - Add your actual credentials here
-            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"74a5eb8d3b654bb0b489c16850f82b58\"")
-            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"505029905ae54dc2b6f7d982705ae9fb\"")
+            // Secure Spotify API credentials from local.properties
+            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$spotifyClientId\"")
+            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"$spotifyClientSecret\"")
         }
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
             signingConfig = signingConfigs.getByName("persistentDebug")
             
-            // Spotify API credentials - Add your actual credentials here
-            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"74a5eb8d3b654bb0b489c16850f82b58\"")
-            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"505029905ae54dc2b6f7d982705ae9fb\"")
+            // Secure Spotify API credentials from local.properties
+            buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"$spotifyClientId\"")
+            buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"$spotifyClientSecret\"")
         }
     }
 
